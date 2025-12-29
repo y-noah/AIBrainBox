@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: demo
+
+ollama:
+  base-url: http://localhost:11434
+  model: qwen3-vl:8b
+  timeout: 60s
