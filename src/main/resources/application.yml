@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: demo
+
+ollama:
+  base-url: http://localhost:11434
+  model: qwen3-vl:8b
+  timeout: 60s
+
+
+logging:
+  level:
+    org.springframework.web.reactive.function.client.ExchangeFunctions: TRACE
+    reactor.netty.http.client: DEBUG
