@@ -32,6 +32,10 @@ public class OllamaClient implements LLMClient {
     @Override
     public LLMResult generate(LLMRequest request) {
         try {
+            System.out.println("====== OLLAMA RAW INPUT ======");
+            System.out.println(request.userInput());
+            System.out.println("================================");
+
             String response = webClient.post()
                     .uri("/api/generate")
                     .bodyValue("""
@@ -43,7 +47,7 @@ public class OllamaClient implements LLMClient {
                     """.formatted(model, request.userInput()))
                     .retrieve()
                     .bodyToMono(String.class)
-                    .block(Duration.ofMinutes(5));
+                    .block(Duration.ofMinutes(10));
 
             if (response == null || response.isBlank()) {
                 return LLMResult.failure(LLMError.EMPTY_RESPONSE);
@@ -60,43 +64,6 @@ public class OllamaClient implements LLMClient {
             return LLMResult.failure(LLMError.UNKNOWN_ERROR);
         }
     }
-
-
-//    @Override
-//    public LLMResult chat(LLMRequest request) {
-//        System.out.println(">>> chat called: " + request.userInput());
-//        try {
-//            String response = webClient.post()
-//                    .uri("/api/chat")
-//                    .bodyValue("""
-//                {
-//                  "model": "%s",
-//                  "messages": [
-//                    { "role": "user", "content": "%s" }
-//                  ],
-//                  "stream": false
-//                }
-//                """.formatted(model, request.userInput()))
-//                    .retrieve()
-//                    .bodyToMono(String.class)
-//                    .block(Duration.ofMinutes(3));
-//
-//            if (response == null || response.isBlank()) {
-//                return LLMResult.failure(LLMError.EMPTY_RESPONSE);
-//            }
-//
-//            return LLMResult.success(response);
-//
-//        } catch (RuntimeException e) {
-//            if (e.getCause() != null
-//                    && e.getCause().getMessage() != null
-//                    && e.getCause().getMessage().contains("Timeout")) {
-//                return LLMResult.failure(LLMError.TIMEOUT);
-//            }
-//            return LLMResult.failure(LLMError.UNKNOWN_ERROR);
-//        }
-//    }
-
 
     @Override
     public LLMResult chat(LLMRequest request) {
@@ -116,19 +83,16 @@ public class OllamaClient implements LLMClient {
                     "stream", false
             );
 
-            System.out.println("====== OLLAMA CHAT REQUEST ======");
-            System.out.println("model = " + model);
-            System.out.println("system prompt = ");
-            System.out.println(SystemPrompts.INTENT_JSON_ONLY);
-            System.out.println("user input = " + request.userInput());
-            System.out.println("=================================");
+            System.out.println("====== OLLAMA RAW INPUT ======");
+            System.out.println(body.get("messages").toString());
+            System.out.println("================================");
 
             String response = webClient.post()
                     .uri("/api/chat")
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(String.class)
-                    .block(Duration.ofMinutes(5));
+                    .block(Duration.ofMinutes(10));
 
             System.out.println("====== OLLAMA RAW RESPONSE ======");
             System.out.println(response);

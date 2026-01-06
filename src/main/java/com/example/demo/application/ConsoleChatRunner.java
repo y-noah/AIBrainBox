@@ -14,7 +14,6 @@ public class ConsoleChatRunner implements ApplicationRunner {
     private final LLMClient llmClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // ====== 常量只放在 Runner 里 ======
     private static final double CONFIDENCE_THRESHOLD = 0.6;
 
     public ConsoleChatRunner(LLMClient llmClient) {
@@ -49,9 +48,6 @@ public class ConsoleChatRunner implements ApplicationRunner {
 
                 // 2. 拿到模型返回的 JSON 字符串
                 String intentJson = ollama.getMessage().getContent();
-
-                System.out.println(">>> MODEL INTENT JSON:");
-                System.out.println(intentJson);
 
                 // 3. 解析 intent JSON
                 IntentResult intent =
