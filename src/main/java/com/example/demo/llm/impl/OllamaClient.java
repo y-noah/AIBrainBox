@@ -8,12 +8,11 @@ import com.example.demo.llm.api.LLMResult;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 
 @Component
 public class OllamaClient implements LLMClient {
@@ -68,23 +67,26 @@ public class OllamaClient implements LLMClient {
     @Override
     public LLMResult chat(LLMRequest request) {
         try {
+            // ========== 核心改动：支持动态 SystemPrompt ==========
+            // 如果 request 中有 systemPrompt，使用它；否则使用默认的 INTENT_JSON_ONLY
+            String systemPrompt = request.hasSystemPrompt()
+                    ? request.systemPrompt()
+                    : SystemPrompts.INTENT_JSON_ONLY;
+
+            // 构建消息列表
+            List<Map<String, String>> messages = new ArrayList<>();
+            messages.add(Map.of("role", "system", "content", systemPrompt));
+            messages.add(Map.of("role", "user", "content", request.userInput()));
+
             Map<String, Object> body = Map.of(
                     "model", model,
-                    "messages", List.of(
-                            Map.of(
-                                    "role", "system",
-                                    "content", SystemPrompts.INTENT_JSON_ONLY
-                            ),
-                            Map.of(
-                                    "role", "user",
-                                    "content", request.userInput()
-                            )
-                    ),
+                    "messages", messages,
                     "stream", false
             );
 
             System.out.println("====== OLLAMA RAW INPUT ======");
-            System.out.println(body.get("messages").toString());
+            System.out.println("System Prompt: " + systemPrompt.substring(0, Math.min(100, systemPrompt.length())) + "...");
+            System.out.println("User Input: " + request.userInput());
             System.out.println("================================");
 
             String response = webClient.post()
