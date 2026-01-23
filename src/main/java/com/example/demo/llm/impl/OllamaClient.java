@@ -52,6 +52,7 @@ public class OllamaClient implements LLMClient {
                 return LLMResult.failure(LLMError.EMPTY_RESPONSE);
             }
 
+
             return LLMResult.success(response);
 
         } catch (RuntimeException e) {

@@ -1,10 +1,7 @@
 package com.example.demo.application;
 
-import com.example.demo.capability.CapabilityDescriptor;
-import com.example.demo.capability.CapabilityMatchResult;
-import com.example.demo.capability.CapabilityRegistry;
-import com.example.demo.capability.MatchStatus;
-import com.example.demo.capability.ParameterDefinition;
+import com.example.demo.capability.*;
+import com.example.demo.conversation.*;
 import com.example.demo.llm.api.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.ApplicationArguments;
@@ -20,14 +17,23 @@ public class ConsoleChatRunner implements ApplicationRunner {
 
     private final LLMClient llmClient;
     private final CapabilityRegistry capabilityRegistry;
+    private final ConversationManager conversationManager;
+    private final ClarificationHandler clarificationHandler;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final double CONFIDENCE_THRESHOLD = 0.6;
     private static final double MATCH_CONFIDENCE_THRESHOLD = 0.7;
+    private static final String SESSION_ID = "console";  // 控制台固定会话ID
 
-    public ConsoleChatRunner(LLMClient llmClient, CapabilityRegistry capabilityRegistry) {
+    public ConsoleChatRunner(
+            LLMClient llmClient,
+            CapabilityRegistry capabilityRegistry,
+            ConversationManager conversationManager,
+            ClarificationHandler clarificationHandler) {
         this.llmClient = llmClient;
         this.capabilityRegistry = capabilityRegistry;
+        this.conversationManager = conversationManager;
+        this.clarificationHandler = clarificationHandler;
         runPhaseOneTests();
     }
 
@@ -99,7 +105,11 @@ public class ConsoleChatRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Console Chat started. 输入 exit 退出\n");
+        System.out.println("Console Chat started. 输入 exit 退出");
+        System.out.println("输入 reset 可以重置对话\n");
+
+        // 获取或创建对话上下文
+        ConversationContext context = conversationManager.getOrCreateContext(SESSION_ID);
 
         while (true) {
             System.out.print("> ");
@@ -109,50 +119,15 @@ public class ConsoleChatRunner implements ApplicationRunner {
                 break;
             }
 
+            if ("reset".equalsIgnoreCase(input)) {
+                conversationManager.resetContext(SESSION_ID);
+                context = conversationManager.getOrCreateContext(SESSION_ID);
+                System.out.println("✅ 对话已重置\n");
+                continue;
+            }
+
             try {
-                // ========== Stage 1: Intent Judge ==========
-                IntentResult intent = executeStageOne(input);
-                if (intent == null) {
-                    continue; // 发生错误，已处理
-                }
-
-                // 检查是否应该处理
-                if (!intent.isShouldProcess()) {
-                    System.out.println("❌ 问题不应被处理");
-                    System.out.println("   原因: " + intent.getReason());
-                    System.out.println();
-                    continue;
-                }
-
-                // 检查置信度
-                if (intent.getConfidence() < CONFIDENCE_THRESHOLD) {
-                    System.out.println("❌ 不可信输入，拒绝处理");
-                    System.out.println("   置信度: " + intent.getConfidence());
-                    System.out.println("   原因: " + intent.getReason());
-                    System.out.println();
-                    continue;
-                }
-
-                System.out.println("✅ Stage 1 通过");
-                System.out.println("   意图: " + intent.getIntent());
-                System.out.println("   问题类型: " + intent.getQuestionType());
-                System.out.println("   置信度: " + intent.getConfidence());
-                System.out.println();
-
-                // ========== Stage 2: Capability Match ==========
-                CapabilityMatchResult matchResult = executeStageTwo(input);
-                if (matchResult == null) {
-                    continue; // 发生错误，已处理
-                }
-
-                System.out.println("✅ Stage 2 完成");
-                System.out.println("   匹配状态: " + matchResult.matchStatus());
-                System.out.println("   置信度: " + matchResult.confidence());
-                System.out.println();
-
-                // ========== Stage 3: System Validation & Decision ==========
-                handleMatchResult(intent, matchResult);
-
+                processUserInput(input, context);
             } catch (Exception e) {
                 System.out.println("❌ 处理过程中发生错误");
                 e.printStackTrace(System.out);
@@ -162,11 +137,120 @@ public class ConsoleChatRunner implements ApplicationRunner {
     }
 
     /**
+     * 处理用户输入（支持多轮对话）
+     */
+    private void processUserInput(String input, ConversationContext context) {
+        System.out.println();
+
+        // ========== 检查是否在等待澄清 ==========
+        if (context.isAwaitingClarification()) {
+            handleClarificationResponse(input, context);
+            return;
+        }
+
+        // ========== 正常流程：新问题 ==========
+        handleNewQuestion(input, context);
+    }
+
+    /**
+     * 处理澄清响应（用户补充缺失的参数）
+     */
+    private void handleClarificationResponse(String input, ConversationContext context) {
+        System.out.println("========== 处理补充信息 ==========");
+
+        // 尝试提取缺失的参数
+        CapabilityMatchResult updatedMatch = clarificationHandler.handleClarification(
+                input,
+                context
+        );
+
+        if (updatedMatch == null) {
+            System.out.println("❌ 无法从您的输入中提取所需参数");
+            System.out.println("   请重新输入完整问题，或输入 'reset' 重新开始");
+            System.out.println();
+            return;
+        }
+
+        System.out.println("✅ 已补充参数");
+        System.out.println("   参数: " + updatedMatch.extractedParameters());
+        System.out.println();
+
+        // 获取之前保存的意图
+        IntentResult intent = context.getPendingIntent();
+
+        // 清除等待状态
+        context.clearPending();
+
+        // 直接进入 Stage 3 校验和执行
+        handleMatchResult(intent, updatedMatch);
+
+        // 记录对话轮次
+        context.addTurn(ConversationTurn.clarification(
+                input,
+                "已补充参数，准备执行工具"
+        ));
+    }
+
+    /**
+     * 处理新问题
+     */
+    private void handleNewQuestion(String input, ConversationContext context) {
+        // ========== Stage 1: Intent Judge ==========
+        IntentResult intent = executeStageOne(input);
+        if (intent == null) {
+            return;
+        }
+
+        // 检查是否应该处理
+        if (!intent.isShouldProcess()) {
+            System.out.println("❌ 问题不应被处理");
+            System.out.println("   原因: " + intent.getReason());
+            System.out.println();
+            return;
+        }
+
+        // 检查置信度
+        if (intent.getConfidence() < CONFIDENCE_THRESHOLD) {
+            System.out.println("❌ 不可信输入，拒绝处理");
+            System.out.println("   置信度: " + intent.getConfidence());
+            System.out.println("   原因: " + intent.getReason());
+            System.out.println();
+            return;
+        }
+
+        System.out.println("✅ Stage 1 通过");
+        System.out.println("   意图: " + intent.getIntent());
+        System.out.println("   问题类型: " + intent.getQuestionType());
+        System.out.println("   置信度: " + intent.getConfidence());
+        System.out.println();
+
+        // ========== Stage 2: Capability Match ==========
+        CapabilityMatchResult matchResult = executeStageTwo(input);
+        if (matchResult == null) {
+            return;
+        }
+
+        System.out.println("✅ Stage 2 完成");
+        System.out.println("   匹配状态: " + matchResult.matchStatus());
+        System.out.println("   置信度: " + matchResult.confidence());
+        System.out.println();
+
+        // ========== Stage 3: Decision ==========
+        handleMatchResultWithContext(intent, matchResult, context);
+
+        // 记录对话轮次
+        context.addTurn(ConversationTurn.question(
+                input,
+                "已处理问题"
+        ));
+    }
+
+    /**
      * Stage 1: Intent Judge
      * 判断问题是否应该处理，识别问题类型
      */
     private IntentResult executeStageOne(String userInput) {
-        System.out.println("\n========== Stage 1: Intent Judge ==========");
+        System.out.println("========== Stage 1: Intent Judge ==========");
 
         LLMResult judgeResult = llmClient.chat(new LLMRequest(userInput));
 
@@ -252,7 +336,27 @@ public class ConsoleChatRunner implements ApplicationRunner {
     }
 
     /**
-     * Stage 3: 根据匹配结果决定下一步操作
+     * Stage 3: 根据匹配结果决定下一步操作（支持多轮对话）
+     */
+    private void handleMatchResultWithContext(
+            IntentResult intent,
+            CapabilityMatchResult matchResult,
+            ConversationContext context) {
+
+        System.out.println("========== Stage 3: Decision ==========");
+
+        switch (matchResult.matchStatus()) {
+            case MATCHED -> handleMatched(intent, matchResult);
+            case NO_MATCH -> handleNoMatch(matchResult);
+            case MISSING_ENTITY -> handleMissingEntityWithContext(matchResult, intent, context);
+            case AMBIGUOUS -> handleAmbiguous(matchResult);
+        }
+
+        System.out.println();
+    }
+
+    /**
+     * Stage 3: 根据匹配结果决定下一步操作（不带上下文，用于补充参数后的处理）
      */
     private void handleMatchResult(IntentResult intent, CapabilityMatchResult matchResult) {
         System.out.println("========== Stage 3: Decision ==========");
@@ -322,7 +426,7 @@ public class ConsoleChatRunner implements ApplicationRunner {
     }
 
     /**
-     * 处理：缺少参数
+     * 处理：缺少参数（不带上下文）
      */
     private void handleMissingEntity(CapabilityMatchResult matchResult) {
         System.out.println("❌ 缺少必需参数");
@@ -330,6 +434,29 @@ public class ConsoleChatRunner implements ApplicationRunner {
         if (matchResult.userGuidance() != null) {
             System.out.println("   提示: " + matchResult.userGuidance());
         }
+    }
+
+    /**
+     * 处理：缺少参数（支持多轮对话）
+     */
+    private void handleMissingEntityWithContext(
+            CapabilityMatchResult matchResult,
+            IntentResult intent,
+            ConversationContext context) {
+
+        System.out.println("❌ 缺少必需参数");
+        System.out.println("   原因: " + matchResult.reason());
+
+        // 生成澄清问题
+        String clarification = clarificationHandler.generateClarificationQuestion(matchResult);
+        System.out.println();
+        System.out.println(">>> " + clarification);
+
+        // 设置上下文为等待澄清状态
+        context.awaitClarification(intent, matchResult);
+
+        System.out.println();
+        System.out.println("💡 提示：直接输入所需信息即可，无需重复整个问题");
     }
 
     /**
@@ -399,7 +526,7 @@ public class ConsoleChatRunner implements ApplicationRunner {
                                           CapabilityDescriptor capability) {
         // 如果问题类型是确定性查询，但匹配到了知识库，拒绝
         if (intent.getQuestionType() == QuestionType.DETERMINISTIC_QUERY
-                && capability.type() == com.example.demo.capability.CapabilityType.KNOWLEDGE_BASE) {
+                && capability.type() == CapabilityType.KNOWLEDGE_BASE) {
             System.out.println("❌ 工具类型校验失败");
             System.out.println("   问题类型: " + intent.getQuestionType());
             System.out.println("   匹配的工具类型: " + capability.type());
