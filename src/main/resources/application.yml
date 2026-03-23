@@ -7,6 +7,13 @@ ollama:
   model: qwen3-vl:8b
   timeout: 60s
 
+milvus:
+  host: localhost
+  port: 19530
+  collection-name: aibrainbox_knowledge
+  dimension: 4096 # 默认根据模型调整，qwen3-vl:8b 应该是 4096，或者 1024/1536，具体取决于模型层级
+
+
 
 logging:
   level:

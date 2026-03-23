@@ -5,12 +5,14 @@ import com.example.demo.llm.api.LLMClient;
 import com.example.demo.llm.api.LLMError;
 import com.example.demo.llm.api.LLMRequest;
 import com.example.demo.llm.api.LLMResult;
+import com.example.demo.llm.api.OllamaEmbeddingResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -24,8 +26,31 @@ public class OllamaClient implements LLMClient {
                         @Value("${ollama.model}") String model) {
         this.webClient = WebClient.builder()
                 .baseUrl(baseUrl)
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024)) // 增大内存限制以支持较大的 embedding 响应
                 .build();
         this.model = model;
+    }
+
+    @Override
+    public List<Float> embed(String text) {
+        try {
+            OllamaEmbeddingResponse response = webClient.post()
+                    .uri("/api/embeddings")
+                    .bodyValue(Map.of(
+                            "model", model,
+                            "prompt", text
+                    ))
+                    .retrieve()
+                    .bodyToMono(OllamaEmbeddingResponse.class)
+                    .block(Duration.ofMinutes(1));
+
+            if (response != null && response.getEmbedding() != null) {
+                return response.getEmbedding();
+            }
+        } catch (Exception e) {
+            System.err.println("Embedding error: " + e.getMessage());
+        }
+        return Collections.emptyList();
     }
 
     @Override
@@ -37,13 +62,11 @@ public class OllamaClient implements LLMClient {
 
             String response = webClient.post()
                     .uri("/api/generate")
-                    .bodyValue("""
-                    {
-                      "model": "%s",
-                      "prompt": "%s",
-                      "stream": false
-                    }
-                    """.formatted(model, request.userInput()))
+                    .bodyValue(Map.of(
+                            "model", model,
+                            "prompt", request.userInput(),
+                            "stream", false
+                    ))
                     .retrieve()
                     .bodyToMono(String.class)
                     .block(Duration.ofMinutes(10));

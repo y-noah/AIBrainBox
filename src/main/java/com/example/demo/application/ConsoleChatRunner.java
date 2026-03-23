@@ -3,6 +3,7 @@ package com.example.demo.application;
 import com.example.demo.capability.*;
 import com.example.demo.conversation.*;
 import com.example.demo.llm.api.*;
+import com.example.demo.rag.service.RAGService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -19,6 +20,7 @@ public class ConsoleChatRunner implements ApplicationRunner {
     private final CapabilityRegistry capabilityRegistry;
     private final ConversationManager conversationManager;
     private final ClarificationHandler clarificationHandler;
+    private final RAGService ragService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final double CONFIDENCE_THRESHOLD = 0.6;
@@ -29,11 +31,13 @@ public class ConsoleChatRunner implements ApplicationRunner {
             LLMClient llmClient,
             CapabilityRegistry capabilityRegistry,
             ConversationManager conversationManager,
-            ClarificationHandler clarificationHandler) {
+            ClarificationHandler clarificationHandler,
+            RAGService ragService) {
         this.llmClient = llmClient;
         this.capabilityRegistry = capabilityRegistry;
         this.conversationManager = conversationManager;
         this.clarificationHandler = clarificationHandler;
+        this.ragService = ragService;
         runPhaseOneTests();
     }
 
@@ -272,6 +276,7 @@ public class ConsoleChatRunner implements ApplicationRunner {
 
             // 解析 intent JSON
             IntentResult intent = objectMapper.readValue(intentJson, IntentResult.class);
+            intent.setOriginalQuestion(userInput); // 保存原始问题
 
             return intent;
 
@@ -346,10 +351,18 @@ public class ConsoleChatRunner implements ApplicationRunner {
         System.out.println("========== Stage 3: Decision ==========");
 
         switch (matchResult.matchStatus()) {
-            case MATCHED -> handleMatched(intent, matchResult);
-            case NO_MATCH -> handleNoMatch(matchResult);
-            case MISSING_ENTITY -> handleMissingEntityWithContext(matchResult, intent, context);
-            case AMBIGUOUS -> handleAmbiguous(matchResult);
+            case MATCHED:
+                handleMatched(intent, matchResult);
+                break;
+            case NO_MATCH:
+                handleNoMatch(matchResult);
+                break;
+            case MISSING_ENTITY:
+                handleMissingEntityWithContext(matchResult, intent, context);
+                break;
+            case AMBIGUOUS:
+                handleAmbiguous(matchResult);
+                break;
         }
 
         System.out.println();
@@ -362,10 +375,18 @@ public class ConsoleChatRunner implements ApplicationRunner {
         System.out.println("========== Stage 3: Decision ==========");
 
         switch (matchResult.matchStatus()) {
-            case MATCHED -> handleMatched(intent, matchResult);
-            case NO_MATCH -> handleNoMatch(matchResult);
-            case MISSING_ENTITY -> handleMissingEntity(matchResult);
-            case AMBIGUOUS -> handleAmbiguous(matchResult);
+            case MATCHED:
+                handleMatched(intent, matchResult);
+                break;
+            case NO_MATCH:
+                handleNoMatch(matchResult);
+                break;
+            case MISSING_ENTITY:
+                handleMissingEntity(matchResult);
+                break;
+            case AMBIGUOUS:
+                handleAmbiguous(matchResult);
+                break;
         }
 
         System.out.println();
@@ -405,13 +426,24 @@ public class ConsoleChatRunner implements ApplicationRunner {
             return;
         }
 
-        // ========== 所有校验通过，准备执行 ==========
+        // ========== 所有校验通过，开始执行 ==========
         System.out.println("✅ 所有校验通过，准备执行工具");
         System.out.println("   工具: " + capability.name());
         System.out.println("   工具ID: " + matchResult.matchedCapabilityId());
-        System.out.println("   参数: " + matchResult.extractedParameters());
         System.out.println();
-        System.out.println("⚠️  注意：当前阶段只展示匹配结果，暂不实际执行工具");
+
+        // 如果是知识库类型，执行 RAG
+        if (capability.type() == CapabilityType.KNOWLEDGE_BASE) {
+            System.out.println("正在检索知识库...");
+            String answer = ragService.askWithRAG(intent.getOriginalQuestion());
+            System.out.println("\nAI (RAG) 回答:");
+            System.out.println("-".repeat(40));
+            System.out.println(answer);
+            System.out.println("-".repeat(40));
+        } else {
+            System.out.println("   参数: " + matchResult.extractedParameters());
+            System.out.println("⚠️  注意：当前普通工具阶段只展示匹配结果，暂不实际执行 Mock 逻辑");
+        }
     }
 
     /**

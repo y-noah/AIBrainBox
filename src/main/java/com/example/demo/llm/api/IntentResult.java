@@ -13,8 +13,18 @@ public class IntentResult {
     @JsonProperty("question_type")
     private QuestionType questionType;
 
+    private String originalQuestion; // 记录原始问题
+
     // 无参构造函数（Jackson 需要）
     public IntentResult() {}
+
+    public String getOriginalQuestion() {
+        return originalQuestion;
+    }
+
+    public void setOriginalQuestion(String originalQuestion) {
+        this.originalQuestion = originalQuestion;
+    }
 
     // Getters
     public String getIntent() {
