@@ -351,18 +351,10 @@ public class ConsoleChatRunner implements ApplicationRunner {
         System.out.println("========== Stage 3: Decision ==========");
 
         switch (matchResult.matchStatus()) {
-            case MATCHED:
-                handleMatched(intent, matchResult);
-                break;
-            case NO_MATCH:
-                handleNoMatch(matchResult);
-                break;
-            case MISSING_ENTITY:
-                handleMissingEntityWithContext(matchResult, intent, context);
-                break;
-            case AMBIGUOUS:
-                handleAmbiguous(matchResult);
-                break;
+            case MATCHED -> handleMatched(intent, matchResult);
+            case NO_MATCH -> handleNoMatch(matchResult);
+            case MISSING_ENTITY -> handleMissingEntityWithContext(matchResult, intent, context);
+            case AMBIGUOUS -> handleAmbiguous(matchResult);
         }
 
         System.out.println();
@@ -375,18 +367,10 @@ public class ConsoleChatRunner implements ApplicationRunner {
         System.out.println("========== Stage 3: Decision ==========");
 
         switch (matchResult.matchStatus()) {
-            case MATCHED:
-                handleMatched(intent, matchResult);
-                break;
-            case NO_MATCH:
-                handleNoMatch(matchResult);
-                break;
-            case MISSING_ENTITY:
-                handleMissingEntity(matchResult);
-                break;
-            case AMBIGUOUS:
-                handleAmbiguous(matchResult);
-                break;
+            case MATCHED -> handleMatched(intent, matchResult);
+            case NO_MATCH -> handleNoMatch(matchResult);
+            case MISSING_ENTITY -> handleMissingEntity(matchResult);
+            case AMBIGUOUS -> handleAmbiguous(matchResult);
         }
 
         System.out.println();

@@ -1,13 +1,5 @@
 {
     "java.compile.nullAnalysis.mode": "automatic",
     "java.configuration.updateBuildConfiguration": "automatic",
-    "java.debug.settings.onBuildFailureProceed": true,
-    "java.configuration.runtimes": [
-        {
-            "name": "JavaSE-25",
-            "path": "C:\\Soft\\Java\\jdk-25.0.1",
-            "default": true
-        }
-    ],
-    "java.jdt.ls.java.home": "C:\\Soft\\Java\\jdk-25.0.1"
+    "java.debug.settings.onBuildFailureProceed": true
 }
