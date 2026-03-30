@@ -4,8 +4,8 @@ spring:
 
 ollama:
   base-url: http://localhost:11434
-  model: qwen3-vl:8b
-  timeout: 60s
+  model: qwen3:8b
+  timeout: 180s
 
 milvus:
   host: localhost
