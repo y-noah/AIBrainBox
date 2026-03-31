@@ -1,14 +1,20 @@
 spring:
   application:
     name: demo
+  ai:
+    retry:
+      max-attempts: 1
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen3:8b
 
-ollama:
-  base-url: http://localhost:11434
-  model: qwen3-vl:8b
-  timeout: 60s
+app:
+  llm:
+    timeout: 10m
 
 
 logging:
   level:
-    org.springframework.web.reactive.function.client.ExchangeFunctions: TRACE
-    reactor.netty.http.client: DEBUG
+    org.springframework.ai: INFO
