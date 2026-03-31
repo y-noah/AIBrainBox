@@ -4,11 +4,11 @@ spring:
 
 ollama:
   base-url: http://localhost:11434
-  model: qwen3-vl:8b
-  timeout: 60s
+  model: qwen3:8b
+  timeout: 10m
+  max-retries: 0
 
 
 logging:
   level:
-    org.springframework.web.reactive.function.client.ExchangeFunctions: TRACE
-    reactor.netty.http.client: DEBUG
+    dev.langchain4j: INFO

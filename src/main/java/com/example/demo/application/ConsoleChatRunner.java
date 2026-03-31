@@ -1,6 +1,10 @@
 package com.example.demo.application;
 
-import com.example.demo.llm.api.*;
+import com.example.demo.llm.api.IntentResult;
+import com.example.demo.llm.api.LLMClient;
+import com.example.demo.llm.api.LLMError;
+import com.example.demo.llm.api.LLMRequest;
+import com.example.demo.llm.api.LLMResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -23,9 +27,14 @@ public class ConsoleChatRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Console Chat started. 输入 exit 退出");
+        System.out.println("控制台对话已启动。输入 exit 退出。");
 
         while (true) {
+            if (!scanner.hasNextLine()) {
+                System.out.println("检测到输入流已关闭，程序退出。");
+                break;
+            }
+
             System.out.print("> ");
             String input = scanner.nextLine();
 
@@ -33,53 +42,52 @@ public class ConsoleChatRunner implements ApplicationRunner {
                 break;
             }
 
-            /* ========== 第一次调用：Intent Judge ========== */
             LLMResult judgeResult = llmClient.chat(new LLMRequest(input));
 
             if (!judgeResult.isSuccess()) {
-                System.out.println("❌ Intent Judge ERROR: " + judgeResult.error());
+                System.out.println("错误：意图判定失败 -> " + toChineseError(judgeResult.error()));
                 continue;
             }
 
             try {
-                // 1. 解析 Ollama 外层响应
-                OllamaChatResponse ollama =
-                        objectMapper.readValue(judgeResult.rawText(), OllamaChatResponse.class);
+                IntentResult intent = objectMapper.readValue(judgeResult.rawText(), IntentResult.class);
 
-                // 2. 拿到模型返回的 JSON 字符串
-                String intentJson = ollama.getMessage().getContent();
-
-                // 3. 解析 intent JSON
-                IntentResult intent =
-                        objectMapper.readValue(intentJson, IntentResult.class);
-
-                // 4. confidence gate
                 if (intent.getConfidence() < CONFIDENCE_THRESHOLD) {
-                    System.out.println("❌ 不可信输入，拒绝回答");
-                    System.out.println("reason: " + intent.getReason());
+                    System.out.println("拒绝回答：输入可信度不足");
+                    System.out.println("原因: " + intent.getReason());
                     continue;
                 }
 
-                System.out.println("✅ intent: " + intent.getIntent());
-                System.out.println("confidence: " + intent.getConfidence());
+                System.out.println("通过：意图 = " + intent.getIntent());
+                System.out.println("置信度: " + intent.getConfidence());
 
-                /* ========== 第二次调用：真正回答 ========== */
                 LLMResult answerResult = llmClient.generate(new LLMRequest(input));
 
                 if (!answerResult.isSuccess()) {
-                    System.out.println("❌ Answer LLM ERROR: " + answerResult.error());
+                    System.out.println("错误：回答阶段失败 -> " + toChineseError(answerResult.error()));
                     continue;
                 }
 
-                // 直接输出原始回答（此处不再强制 JSON）
-                System.out.println(">>> MODEL ANSWER:");
+                System.out.println(">>> 模型回答:");
                 System.out.println(answerResult.rawText());
 
             } catch (Exception e) {
-                System.out.println("❌ JSON 非法，拒绝模型输出");
+                System.out.println("错误：意图 JSON 非法，已拒绝输出");
                 System.out.println(judgeResult.rawText());
                 e.printStackTrace(System.out);
             }
         }
+    }
+
+    private String toChineseError(LLMError error) {
+        if (error == null) {
+            return "未知错误";
+        }
+        return switch (error) {
+            case CONNECTION_FAILED -> "连接失败";
+            case EMPTY_RESPONSE -> "模型返回为空";
+            case UNKNOWN_ERROR -> "未知错误";
+            case TIMEOUT -> "调用超时";
+        };
     }
 }
