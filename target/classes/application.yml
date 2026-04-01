@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: demo
+  ai:
+    retry:
+      max-attempts: 1
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen3:8b
+
+app:
+  llm:
+    timeout: 10m
+
+
+logging:
+  level:
+    org.springframework.ai: INFO
