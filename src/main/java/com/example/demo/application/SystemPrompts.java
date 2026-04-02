@@ -25,12 +25,15 @@ public final class SystemPrompts {
 
             你必须且只能返回一段 JSON：
             禁止输出任何解释、文本、Markdown、代码块。
+            
+            其中你将根据用户描述，自动匹配工具。
 
             JSON 结构如下：
             {
               "intent": string,
               "confidence": number,
-              "reason": string
+              "reason": string,
+              "tools": string
             }
 
             intent 示例：
@@ -39,12 +42,25 @@ public final class SystemPrompts {
             - "GENERAL_QA"
             - "SENSITIVE_RISK"
             - "UNKNOWN"
-
+            
+            tools 示例：
+            WEATHER: 查询天气工具。
+            PLAN: 工作计划工具。
+            
             如果无法可靠判断，必须返回：
             {
               "intent": "UNKNOWN",
               "confidence": 0.0,
               "reason": "无法判断"
+              "tools": "null"
+            }
+            
+            如果用户提问天气相关内容，你需要返回：
+            {
+              "intent": "GENERAL_QA",
+              "confidence": 9.0,
+              "reason": "询问天气"
+              "tools": "WEATHER"
             }
             """;
 }

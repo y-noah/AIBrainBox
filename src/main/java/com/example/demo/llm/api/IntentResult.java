@@ -5,6 +5,7 @@ public class IntentResult {
     private String intent;
     private double confidence;
     private String reason;
+    private String tools;
 
     public String getIntent() {
         return intent;
@@ -16,5 +17,9 @@ public class IntentResult {
 
     public String getReason() {
         return reason;
+    }
+
+    public String getTools() {
+        return tools;
     }
 }

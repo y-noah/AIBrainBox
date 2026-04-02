@@ -5,6 +5,7 @@ import com.example.demo.llm.api.LLMClient;
 import com.example.demo.llm.api.LLMError;
 import com.example.demo.llm.api.LLMRequest;
 import com.example.demo.llm.api.LLMResult;
+import com.example.demo.tools.Weather;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -57,6 +58,18 @@ public class ConsoleChatRunner implements ApplicationRunner {
 
                 System.out.println("通过：意图 = " + intent.getIntent());
                 System.out.println("置信度: " + intent.getConfidence());
+
+
+                String tools = intent.getTools();
+
+                if (tools != null) {
+                    if (tools.equals("WEATHER")) {
+                        String weatherFromApi =
+                                "；工具调用返回值：" + Weather.getWeatherFromApi();
+
+                        input += weatherFromApi;
+                    }
+                }
 
                 LLMResult answerResult = llmClient.generate(new LLMRequest(input));
                 if (!answerResult.isSuccess()) {
