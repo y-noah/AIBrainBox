@@ -62,11 +62,10 @@ public class ConsoleChatRunner implements ApplicationRunner {
 
                 String tools = intent.getTools();
 
-                if (tools != null) {
+                if (!"null".equals(tools)) {
                     if (tools.equals("WEATHER")) {
                         String weatherFromApi =
                                 "；工具调用返回值：" + Weather.getWeatherFromApi();
-
                         input += weatherFromApi;
                     }
                 }

@@ -51,15 +51,15 @@ public final class SystemPrompts {
             {
               "intent": "UNKNOWN",
               "confidence": 0.0,
-              "reason": "无法判断"
+              "reason": "无法判断",
               "tools": "null"
             }
             
             如果用户提问天气相关内容，你需要返回：
             {
               "intent": "GENERAL_QA",
-              "confidence": 9.0,
-              "reason": "询问天气"
+              "confidence": 1.0,
+              "reason": "询问天气",
               "tools": "WEATHER"
             }
             """;
