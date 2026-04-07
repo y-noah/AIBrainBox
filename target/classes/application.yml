@@ -12,10 +12,16 @@ spring:
     retry:
       max-attempts: 1
     ollama:
-      base-url: http://127.0.0.1:11434
+      baseUrl: http://127.0.0.1:11434
       chat:
         options:
           model: qwen3:8b
+
+milvus:
+  host: localhost
+  port: 19530
+  collection-name: aibrainbox_knowledge
+  dimension: 768
 
 app:
   llm:

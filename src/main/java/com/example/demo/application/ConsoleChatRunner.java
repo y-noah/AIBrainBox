@@ -5,12 +5,15 @@ import com.example.demo.llm.api.LLMClient;
 import com.example.demo.llm.api.LLMError;
 import com.example.demo.llm.api.LLMRequest;
 import com.example.demo.llm.api.LLMResult;
+import com.example.demo.rag.service.MilvusService;
 import com.example.demo.tools.Weather;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Scanner;
 
 @Component
@@ -25,8 +28,25 @@ public class ConsoleChatRunner implements ApplicationRunner {
         this.llmClient = llmClient;
     }
 
+    @Autowired
+    private MilvusService milvusService;
     @Override
     public void run(ApplicationArguments args) {
+        // 第一步：插入测试数据
+        List<String> chunks = List.of(
+                "于洋是一名Java工程师，擅长Spring Boot开发",
+                "RAG是检索增强生成，结合向量检索和大模型生成",
+                "Milvus是一个开源的向量数据库，支持相似度检索"
+        );
+        milvusService.insert(chunks);
+
+        // 第二步：检索
+        List<String> results = milvusService.search("什么是RAG", 2);
+        System.out.println("===检索结果===");
+        results.forEach(System.out::println);
+
+
+
         Scanner scanner = new Scanner(System.in);
         System.out.println("控制台对话已启动。输入 exit 退出。");
 
